@@ -5,7 +5,7 @@ import pytest
 from litellm.proxy._types import UserAPIKeyAuth
 from litellm.types.utils import ChatCompletionDeltaToolCall, Delta, Function, ModelResponseStream, StreamingChoices, Usage
 
-from solesonic_litellm_plugins.tokens_per_second import TokensPerSecondLogger
+from solesonic_litellm_tokens_per_second import TokensPerSecondLogger
 
 USER: UserAPIKeyAuth = UserAPIKeyAuth()
 

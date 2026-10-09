@@ -3,31 +3,39 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "solesonic-litellm-plugins"
+name = "solesonic-litellm-tokens-per-second"
 version = "0.1.0"
-description = "LiteLLM proxy plugins: tokens-per-second in streamed chat completion usage"
+description = "LiteLLM proxy callback that adds tokens_per_second to the usage of streamed chat completions"
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Isaac Peel" }]
-keywords = ["litellm", "llm", "proxy", "plugin", "callback", "tokens-per-second"]
+keywords = ["litellm", "litellm-proxy", "llm", "callback", "plugin", "tokens-per-second", "streaming"]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
     "Framework :: AsyncIO",
     "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
 ]
-# litellm is deliberately not a runtime dependency: the plugin runs inside an existing
+# litellm is deliberately not a runtime dependency: the callback runs inside an existing
 # LiteLLM proxy, and declaring it would let pip upgrade or downgrade the proxy's own litellm.
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["litellm[proxy]>=1.104.2", "pytest>=8", "pytest-asyncio>=0.24"]
+dev = ["litellm[proxy]>=1.104.2", "pytest>=8", "pytest-asyncio>=0.24", "build>=1.2"]
 
 [project.urls]
-Homepage = "https://github.com/isaacpeel/solesonic-litellm-plugins"
+Homepage = "https://github.com/isaacpeel/solesonic-litellm-tokens-per-second"
+Repository = "https://github.com/isaacpeel/solesonic-litellm-tokens-per-second"
+Issues = "https://github.com/isaacpeel/solesonic-litellm-tokens-per-second/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/solesonic_litellm_plugins"]
+packages = ["src/solesonic_litellm_tokens_per_second"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

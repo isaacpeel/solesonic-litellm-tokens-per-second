@@ -1,6 +1,6 @@
 litellm_settings:
   callbacks:
-    - solesonic_litellm_plugins.tokens_per_second.tokens_per_second_handler
+    - solesonic_litellm_tokens_per_second.tokens_per_second_handler
 
 general_settings:
   always_include_stream_usage: true
