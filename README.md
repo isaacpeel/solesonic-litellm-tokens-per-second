@@ -39,27 +39,58 @@ You need a running LiteLLM proxy. The package does not declare `litellm` as a de
 
 ### 1. Install the package where the proxy runs
 
-If you run the proxy from a Python environment, install into that same environment:
+#### Proxy running from a Python environment
+
+Install into the same environment that runs `litellm`:
 
 ```bash
-pip install "git+https://github.com/isaacpeel/solesonic-litellm-tokens-per-second.git@v0.1.0"
+pip install "solesonic-litellm-tokens-per-second @ https://github.com/isaacpeel/solesonic-litellm-tokens-per-second/archive/refs/tags/v0.1.0.tar.gz"
 ```
 
-If you run the official Docker image, extend it. [`examples/Dockerfile`](examples/Dockerfile) does this:
+#### Proxy running in Docker
+
+Current LiteLLM images (the published `ghcr.io/berriai/litellm` images and images built from LiteLLM's own `Dockerfile`) keep the proxy's Python in `/app/.venv` and ship without `pip`, `uv`, or `git`. So `RUN pip install ...` and `git+https://` installs fail on them. Instead, borrow `uv` from its official image for the one install step and install from the release archive, which needs no `git`. [`examples/Dockerfile`](examples/Dockerfile) does exactly that:
 
 ```dockerfile
 ARG LITELLM_IMAGE=ghcr.io/berriai/litellm:main-stable
+ARG TPS_VERSION=v0.1.0
+
+FROM ghcr.io/astral-sh/uv:0.11.7 AS uv
+
 FROM ${LITELLM_IMAGE}
-RUN pip install --no-cache-dir "git+https://github.com/isaacpeel/solesonic-litellm-tokens-per-second.git@v0.1.0"
+ARG TPS_VERSION
+RUN --mount=from=uv,source=/uv,target=/bin/uv \
+    uv pip install --python /app/.venv/bin/python --no-cache \
+    "solesonic-litellm-tokens-per-second @ https://github.com/isaacpeel/solesonic-litellm-tokens-per-second/archive/refs/tags/${TPS_VERSION}.tar.gz"
 ```
 
-Pin `LITELLM_IMAGE` to the tag you run in production, then build it:
+The `--mount` only exists for that `RUN`, so `uv` is not left in the final image. It needs BuildKit, which is the default builder in current Docker
+
+You can confirm your image has this layout before building:
 
 ```bash
-docker build -f examples/Dockerfile -t litellm-with-tps .
+docker run --rm --entrypoint ls <your-litellm-image> /app/.venv/bin/python
 ```
 
-If you build the proxy from your own LiteLLM checkout, add the same `RUN pip install ...` line to that Dockerfile
+If you use the published image, pin `LITELLM_IMAGE` to the tag you run and build:
+
+```bash
+docker build -f examples/Dockerfile --build-arg LITELLM_IMAGE=ghcr.io/berriai/litellm:<tag> -t litellm-with-tps .
+```
+
+If you build the proxy from your own LiteLLM checkout, build that image first, then pass its tag as `LITELLM_IMAGE`:
+
+```bash
+cd /path/to/litellm
+docker build -t litellm-base .
+docker build -f /path/to/solesonic-litellm-tokens-per-second/examples/Dockerfile --build-arg LITELLM_IMAGE=litellm-base -t litellm-with-tps .
+```
+
+Check that the package landed in the proxy's environment:
+
+```bash
+docker run --rm --entrypoint /app/.venv/bin/python litellm-with-tps -c "import solesonic_litellm_tokens_per_second; print('installed')"
+```
 
 ### 2. Register the callback and turn on stream usage
 
@@ -76,7 +107,9 @@ general_settings:
 
 `always_include_stream_usage` matters. LiteLLM already asks the provider for usage on every stream for its own spend tracking, but it strips the usage chunk before the client sees it unless the client sent `stream_options.include_usage`. With this setting on, every streaming client gets the usage chunk, and therefore `tokens_per_second`, without changing anything on its side. If you leave it off, the callback still works for clients that send `"stream_options": {"include_usage": true}`
 
-If your models live in the database and you do not use a config file yet, a config containing only these lines is enough. Pass it with `--config /path/to/config.yaml`. With Docker Compose, mount it and add the flag to the command:
+If your models live in the database and you do not use a config file yet, a config containing only these lines is enough. Pass it with `--config /path/to/config.yaml`
+
+With Docker Compose, point the service at the image you built in step 1, mount the config, and add the flag to the command. Keep any `environment`, `volumes`, and `depends_on` entries you already have:
 
 ```yaml
 services:
@@ -85,6 +118,33 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml
     command: ["--port", "4000", "--config", "/app/config.yaml"]
+```
+
+If your Compose file currently builds the proxy with `build:` from a LiteLLM checkout, you can let Compose build both layers instead of running the two `docker build` commands by hand. Copy `examples/Dockerfile` next to your `docker-compose.yml` as `Dockerfile.tps`, then:
+
+```yaml
+services:
+  litellm-base:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: litellm-base
+    profiles: ["build-only"]
+
+  litellm:
+    build:
+      context: .
+      dockerfile: Dockerfile.tps
+      args:
+        LITELLM_IMAGE: litellm-base
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    command: ["--port", "4000", "--config", "/app/config.yaml"]
+```
+
+```bash
+docker compose build litellm-base
+docker compose up -d --build litellm
 ```
 
 ### 3. Restart the proxy and check it
