@@ -1,5 +1,5 @@
 ARG LITELLM_IMAGE=ghcr.io/berriai/litellm:main-stable
-ARG TPS_VERSION=v0.1.0
+ARG TPS_VERSION=v0.2.0
 
 FROM ghcr.io/astral-sh/uv:0.11.7 AS uv
 
